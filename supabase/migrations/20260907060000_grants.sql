@@ -59,3 +59,22 @@ grant select, insert, delete            on public.invitations          to authen
 -- Pro, and the only thing that stopped it before was the absence of a policy.
 grant select                            on public.entitlements         to authenticated;
 grant select                            on public.group_passes         to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- And the same for tables that do not exist yet.
+--
+-- Without this the fix above decays: the project defaults keep standing, so the
+-- next table added to `public` arrives with all privileges granted to anon and
+-- authenticated all over again, and the grants stop describing the app a second
+-- time. Existing grants are untouched — this only changes what a *future*
+-- create table starts with.
+--
+-- The consequence, worth knowing before it surprises someone: a table made
+-- through the dashboard's table editor will now be invisible to the API until
+-- somebody grants it deliberately. That is the point. Every table in this
+-- schema holds either money or the people it belongs to, and none of them
+-- should reach a client because nobody said otherwise.
+-- ---------------------------------------------------------------------------
+
+alter default privileges in schema public revoke all on tables    from anon, authenticated;
+alter default privileges in schema public revoke all on sequences from anon, authenticated;

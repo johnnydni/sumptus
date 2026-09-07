@@ -84,9 +84,16 @@ Nothing leaked. RLS denies by default, every policy is `to authenticated`, and
 `entitlements` has no update policy — so the surplus privilege could not be
 exercised. But it was one forgotten policy away from mattering, and a grant
 that overstates what is allowed is a grant nobody can review.
-`20260907060000_grants.sql` revokes and re-states the lot; the verification now
-asks about the privileges directly, because behaviour cannot see them — a
-privilege nothing exercises looks exactly like one that was never granted.
+`20260907060000_grants.sql` revokes and re-states the lot, and then revokes the
+default privileges themselves so the next table does not arrive with the same
+problem. The verification asks about the privileges directly, because behaviour
+cannot see them — a privilege nothing exercises looks exactly like one that was
+never granted.
+
+**So a new table in `public` now reaches no client until it is granted one.**
+That includes tables made through the dashboard's table editor, where the
+symptom is an API that cannot see a table that plainly exists. Every migration
+that adds one has to say who may touch it, in the same file.
 
 ## Verifying
 
