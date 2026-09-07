@@ -95,6 +95,29 @@ That includes tables made through the dashboard's table editor, where the
 symptom is an API that cannot see a table that plainly exists. Every migration
 that adds one has to say who may touch it, in the same file.
 
+## The email says a code, because the app asks for one
+
+`sendEmailCode` calls `signInWithOtp`, and the screen that follows says "we sent
+six digits". Supabase ships both templates with `{{ .ConfirmationURL }}` in
+them, so out of the box the mail carries a link the app has no way to use — and
+a link is the wrong thing anyway: on iOS the system hands it to whichever
+browser it likes, which for an installed app is not the app, and the person ends
+up signed in somewhere they were not while the icon they tapped still says
+signed out.
+
+`templates/code.html` is the body, and it goes in **both** places under
+Authentication → Email Templates:
+
+- **Magic Link** — used when the address already has an account
+- **Confirm signup** — used the first time an address is seen
+
+`signInWithOtp` chooses between them by whether the user exists. Changing only
+one leaves the first sign-in broken, which is the flow nobody tests twice.
+
+The mail says the code lasts an hour, which is the default. Authentication →
+Providers → Email → Email OTP Expiration is where that actually lives; if it is
+changed, the sentence has to change with it.
+
 ## Verifying
 
 ```bash
