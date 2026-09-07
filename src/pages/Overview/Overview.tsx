@@ -56,12 +56,15 @@ export default function Overview() {
     [groups, expenses, settlements, people],
   );
 
+  /* Fades, not lifts. A section that slides up into place moves the line the
+     eye is already reading, and four of them staggered turn arriving on the
+     overview into half a second of drift. */
   const section = (index: number) =>
     reduced
       ? {}
       : {
-          initial: { opacity: 0, y: 10 },
-          animate: { opacity: 1, y: 0 },
+          initial: { opacity: 0 },
+          animate: { opacity: 1 },
           transition: {
             duration: 0.35,
             delay: index * 0.06,

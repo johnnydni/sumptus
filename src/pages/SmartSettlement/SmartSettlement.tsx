@@ -95,8 +95,8 @@ export default function SmartSettlement() {
             return (
               <motion.div
                 key={`${transfer.groupId}-${transfer.fromPersonId}-${transfer.toPersonId}`}
-                initial={reduced ? false : { opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
+                initial={reduced ? false : { opacity: 0 }}
+                animate={{ opacity: 1 }}
                 transition={{ duration: 0.28, delay: index * 0.05, ease: [0.22, 1, 0.36, 1] }}
                 className="flex items-center gap-3 py-4"
               >

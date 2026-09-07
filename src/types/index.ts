@@ -73,6 +73,16 @@ export interface Group {
    * budget, so an unprocessed upload would evict everything else.
    */
   coverUrl?: string
+  /**
+   * Which horizontal slice of that photo the header frame shows, 0 (top) to
+   * 100 (bottom), as a CSS `object-position` percentage. Absent means centred.
+   *
+   * The photo is never re-cropped for this. A crop would bake one frame's
+   * aspect ratio into the stored bytes, and the same picture has to sit in a
+   * wide header, a taller one on desktop and an 44px square in the group list;
+   * an offset answers all three and stays reversible.
+   */
+  coverY?: number
   currency: CurrencyCode
   members: GroupMember[]
   /**

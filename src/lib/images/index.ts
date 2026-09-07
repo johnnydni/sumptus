@@ -24,6 +24,12 @@ export const COVER_IMAGE: CompressOptions = {
   maxBytes: 400_000,
 }
 
+/**
+ * Where a header photo sits in its frame when nobody has repositioned it, as a
+ * CSS `object-position` percentage: the middle.
+ */
+export const DEFAULT_COVER_OFFSET = 50
+
 export const AVATAR_IMAGE: CompressOptions = {
   maxDimension: 320,
   quality: 0.85,

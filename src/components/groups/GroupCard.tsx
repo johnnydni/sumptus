@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import type { CurrencyCode, Group } from '@/types'
+import { DEFAULT_COVER_OFFSET } from '@/lib/images'
 import { GroupIcon } from '@/components/expenses/CategoryIcon'
 import { AvatarStack } from '@/components/ui/Avatar'
 import { formatMoney, formatSignedMoney, pluralize } from '@/lib/formatting'
@@ -36,6 +37,7 @@ export function GroupCard({
           src={group.coverUrl}
           alt=""
           className="h-11 w-11 shrink-0 rounded-sm border border-line object-cover"
+          style={{ objectPosition: `50% ${group.coverY ?? DEFAULT_COVER_OFFSET}%` }}
         />
       ) : (
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-sm bg-surface text-navy">

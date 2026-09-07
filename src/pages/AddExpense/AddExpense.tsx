@@ -181,8 +181,8 @@ export default function AddExpense() {
     reduced
       ? {}
       : {
-          initial: { opacity: 0, y: 8 },
-          animate: { opacity: 1, y: 0 },
+          initial: { opacity: 0 },
+          animate: { opacity: 1 },
           transition: { duration: 0.3, delay: index * 0.05, ease: [0.22, 1, 0.36, 1] as const },
         }
 

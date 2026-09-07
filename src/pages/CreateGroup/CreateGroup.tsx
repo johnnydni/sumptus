@@ -15,6 +15,7 @@ import { Avatar } from '@/components/ui/Avatar'
 import { GroupIcon } from '@/components/expenses/CategoryIcon'
 import { Sheet } from '@/components/ui/Sheet'
 import { CoverPicker } from '@/components/groups/CoverPicker'
+import { DEFAULT_COVER_OFFSET } from '@/lib/images'
 import { useToast } from '@/components/ui/toastContext'
 import { cn } from '@/lib/cn'
 
@@ -46,6 +47,7 @@ export default function CreateGroup() {
   const [endsOn, setEndsOn] = useState(() => dayKey(new Date()))
   const [icon, setIcon] = useState<GroupIconId>('travel')
   const [coverUrl, setCoverUrl] = useState<string>()
+  const [coverY, setCoverY] = useState(DEFAULT_COVER_OFFSET)
   const [emoji, setEmoji] = useState(EMOJI_CHOICES[0])
   const [memberIds, setMemberIds] = useState<string[]>([])
   const [error, setError] = useState<string>()
@@ -94,6 +96,7 @@ export default function CreateGroup() {
       icon,
       emoji: icon === 'custom' ? emoji : undefined,
       coverUrl,
+      coverY,
       memberIds,
       startsOn,
       endsOn,
@@ -209,7 +212,7 @@ export default function CreateGroup() {
           </section>
         )}
 
-        <CoverPicker value={coverUrl} onChange={setCoverUrl} />
+        <CoverPicker value={coverUrl} offset={coverY} onChange={setCoverUrl} onOffsetChange={setCoverY} />
 
         <fieldset>
           <legend className="eyebrow mb-2">{coverUrl ? 'Icon (used in lists)' : 'Icon'}</legend>

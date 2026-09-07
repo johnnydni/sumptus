@@ -27,6 +27,7 @@ import { Button } from '@/components/ui/Button'
 import { ConfirmDialog, Sheet } from '@/components/ui/Sheet'
 import { Badge, EmptyState, List, SectionHeader } from '@/components/ui/Primitives'
 import { CoverPicker } from '@/components/groups/CoverPicker'
+import { DEFAULT_COVER_OFFSET } from '@/lib/images'
 import { useToast } from '@/components/ui/toastContext'
 import { pluralize } from '@/lib/formatting'
 import { useReducedMotion } from '@/hooks/useReducedMotion'
@@ -138,6 +139,7 @@ export default function GroupDetail() {
             src={group.coverUrl}
             alt=""
             className="h-40 w-full border-b border-line object-cover sm:h-52"
+            style={{ objectPosition: `50% ${group.coverY ?? DEFAULT_COVER_OFFSET}%` }}
           />
         )}
 
@@ -401,10 +403,16 @@ export default function GroupDetail() {
         <div className="pb-2">
           <CoverPicker
             value={group.coverUrl}
+            label={null}
+            offset={group.coverY ?? DEFAULT_COVER_OFFSET}
             onChange={(coverUrl) => {
               updateGroup(group.id, { coverUrl })
               toast.confirm(coverUrl ? 'Header image updated' : 'Header image removed')
             }}
+            // Written straight through on every frame of the drag: the header
+            // behind the sheet is the real preview, and a value only committed
+            // on release would leave it a gesture behind.
+            onOffsetChange={(coverY) => updateGroup(group.id, { coverY })}
           />
         </div>
       </Sheet>

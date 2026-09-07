@@ -71,6 +71,13 @@ Two traps that make a sound layout look broken:
   nav needs. Use `document.documentElement.scrollHeight`.
 - Set the viewport *before* scrolling. Resizing afterwards resets the position.
 
+Screens fade in; they do not move. Entry animations that translate content
+(`y: 8` on the route wrapper, staggered `y: 10` on a page's own sections) look
+like polish in a screenshot and like an app that cannot hold still by the
+fiftieth tap — and they compound, because the shell and the page both animate.
+Opacity carries "new screen" on its own. Sliding is reserved for things that
+genuinely arrive from an edge: the toast, and a newly added row.
+
 `npm run preview` does its own SPA fallback, so it hides exactly the Pages
 routing bugs worth catching. Serve `dist/` under a `/sumptus/` path with a
 plain static server instead.

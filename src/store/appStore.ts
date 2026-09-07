@@ -60,6 +60,7 @@ interface AppState extends PersistedState {
     icon: GroupIconId
     emoji?: string
     coverUrl?: string
+    coverY?: number
     memberIds: string[]
     currency?: CurrencyCode
     /** Both or neither — a start without an end is not a length. */
@@ -189,7 +190,7 @@ export const useAppStore = create<AppState>()((set, get) => {
       void adapter.removeFriend(id)
     },
 
-    createGroup({ name, icon, emoji, coverUrl, memberIds, currency, startsOn, endsOn }) {
+    createGroup({ name, icon, emoji, coverUrl, coverY, memberIds, currency, startsOn, endsOn }) {
       const now = new Date().toISOString()
       const me = get().user?.id
       const uniqueMembers = [...new Set([...(me ? [me] : []), ...memberIds])]
@@ -199,6 +200,7 @@ export const useAppStore = create<AppState>()((set, get) => {
         icon,
         emoji,
         coverUrl,
+        coverY,
         currency: currency ?? get().preferences.currency,
         createdBy: me,
         members: uniqueMembers.map((personId) => ({ personId, joinedAt: now })),

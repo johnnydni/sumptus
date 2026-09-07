@@ -24,6 +24,13 @@ export function AppShell() {
    * itself in front of you.
    *
    * So a POP swaps instantly and the forward direction keeps its fade.
+   *
+   * The fade is all it keeps. Arriving screens used to lift the whole column
+   * eight pixels into place, and every page that staggers its own sections did
+   * the same on top of it — so a single tap set the content drifting upward
+   * for the best part of a second. That reads as polish once and as an app
+   * that cannot hold still by the fiftieth time; opacity says "new screen"
+   * without moving anything the eye is trying to land on.
    */
   const back = useNavigationType() === 'POP'
 
@@ -45,10 +52,10 @@ export function AppShell() {
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={location.pathname}
-            initial={back ? false : reduced ? { opacity: 0 } : { opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={back ? { opacity: 1 } : reduced ? { opacity: 0 } : { opacity: 0, y: -4 }}
-            transition={{ duration: back ? 0 : 0.26, ease: [0.22, 1, 0.36, 1] }}
+            initial={back ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={back ? { opacity: 1 } : { opacity: 0 }}
+            transition={{ duration: back || reduced ? 0 : 0.18, ease: [0.22, 1, 0.36, 1] }}
             className="mb-nav"
           >
             <Outlet />
