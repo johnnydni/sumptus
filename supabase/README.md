@@ -11,6 +11,7 @@ and none of this is wired to it.
 migrations/20260904120000_schema.sql       tables, constraints, invariants
 migrations/20260904120100_rls.sql          policy helpers, policies, grants
 migrations/20260904120200_expense_rpc.sql  create_expense / replace_expense
+migrations/20260907060000_grants.sql       privileges, against the project defaults
 tests/00_supabase_stub.sql                 enough of Supabase to run locally
 tests/01_rls.sql                           22 assertions on isolation
 tests/02_expense_rpc.sql                   6 assertions on the write path
@@ -66,6 +67,27 @@ the participants table and an expense with no participants never fires it.
 write both halves together. They run as the caller, so every policy still
 applies; what they add is atomicity and an error message worth reading.
 
+## A grant on Supabase does not start empty
+
+A project ships with default privileges that hand every new table in `public`
+to `anon`, `authenticated` and `service_role`. So the narrow grants at the foot
+of the RLS migration never narrowed anything — they added privileges the tables
+already had, and the ones deliberately withheld (no update on `settlements`,
+nothing at all for `anon`) were granted anyway.
+
+The local suites cannot see this: the stub has no default privileges, so there
+the missing grant is what refuses the write, and the assertion passes for the
+wrong reason. It took the first run against a real project to surface it, as a
+failure on `rls: cannot grant itself a plan`.
+
+Nothing leaked. RLS denies by default, every policy is `to authenticated`, and
+`entitlements` has no update policy — so the surplus privilege could not be
+exercised. But it was one forgotten policy away from mattering, and a grant
+that overstates what is allowed is a grant nobody can review.
+`20260907060000_grants.sql` revokes and re-states the lot; the verification now
+asks about the privileges directly, because behaviour cannot see them — a
+privilege nothing exercises looks exactly like one that was never granted.
+
 ## Verifying
 
 ```bash
@@ -91,7 +113,10 @@ Two behaviours the suites pin down because they surprise people:
 - An `update` or `delete` against a row a policy hides matches nothing and
   **succeeds**, affecting zero rows. It is not an error. So those assertions
   check that the row is unchanged, read back with policies off — not that the
-  statement was refused.
+  statement was refused. `rls: cannot grant itself a plan` was written the
+  wrong way round despite this paragraph sitting above it, and reported a
+  failure on a plan that was never in danger. If an assertion is about an
+  `update` or a `delete`, it belongs in `check`, not `check_denied`.
 - A `deferrable initially deferred` constraint fires at commit. Inside a test
   that never commits it looks like it passed; the helpers issue
   `set constraints all immediate` to force it.

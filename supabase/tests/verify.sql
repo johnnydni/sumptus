@@ -125,6 +125,26 @@ select pg_temp.check_denied('money: payer must be in the group',
     values (%L, 'Verify outsider', 500, 'EUR', %L, 'equal', %L);
   $f$, current_setting('v.g_anna'), current_setting('v.ben_i'), current_setting('v.anna')));
 
+-- --- grants ----------------------------------------------------------------
+-- Behaviour cannot see these: a privilege nothing exercises looks exactly like
+-- a privilege that was never granted. A Supabase project grants every new table
+-- in `public` to anon and authenticated by default, which is how the narrow
+-- grants in the RLS migration came to mean nothing.
+
+select pg_temp.check('grants: anon reaches nothing',
+  not has_table_privilege('anon', 'public.groups',   'SELECT')
+  and not has_table_privilege('anon', 'public.expenses', 'SELECT')
+  and not has_table_privilege('anon', 'public.profiles', 'SELECT'));
+
+select pg_temp.check('grants: entitlements and passes are read-only to clients',
+  not has_table_privilege('authenticated', 'public.entitlements', 'UPDATE')
+  and not has_table_privilege('authenticated', 'public.entitlements', 'INSERT')
+  and not has_table_privilege('authenticated', 'public.entitlements', 'DELETE')
+  and not has_table_privilege('authenticated', 'public.group_passes', 'UPDATE'));
+
+select pg_temp.check('grants: a settlement cannot be edited into something else',
+  not has_table_privilege('authenticated', 'public.settlements', 'UPDATE'));
+
 -- --- isolation, as a signed-in user ----------------------------------------
 -- BYPASSRLS lives on the current role, so switching to `authenticated` makes
 -- the policies apply even from the dashboard's superuser connection.
@@ -151,9 +171,28 @@ select pg_temp.check_denied('rls: cannot write into a foreign group',
     values (%L, 'Verify intruder', 100, 'EUR', %L, 'equal', %L);
   $f$, current_setting('v.g_ben'), current_setting('v.ben_i'), current_setting('v.anna')));
 
-select pg_temp.check_denied('rls: cannot grant itself a plan',
-  format($f$ update public.entitlements set plan = 'pro' where user_id = %L; $f$,
-    current_setting('v.anna')));
+/*
+ * Not check_denied, however much it looks like its twin above.
+ *
+ * There is no update policy on entitlements, and an update against rows no
+ * policy exposes matches nothing and *succeeds* — zero rows, no error. Once the
+ * grants are tightened it is refused outright instead. Both outcomes are
+ * correct and only one of them raises, so asking "was it refused" measures the
+ * wrong thing; the first run against a real project reported a failure here
+ * while the plan was never in any danger.
+ *
+ * The question worth asking is whether the plan changed.
+ */
+do $$
+begin
+  update public.entitlements set plan = 'pro' where user_id = current_setting('v.anna')::uuid;
+exception when others then
+  null; -- refused outright: also a pass, and what the grants now produce
+end $$;
+
+select pg_temp.check('rls: cannot grant itself a plan',
+  (select plan from public.entitlements where user_id = current_setting('v.anna')::uuid) = 'free',
+  'plan after trying to set it to pro');
 
 select pg_temp.check_denied('rls: cannot claim another account''s identity',
   format($f$
