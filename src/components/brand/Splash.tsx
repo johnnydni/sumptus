@@ -49,32 +49,48 @@ const CIRCLES = {
 /** Where the ink starts spreading: the waist, so it flows both ways at once. */
 const SEED = { x: 0.45, y: 0.5 } as const
 
+/** The payer icon's own proportions, so its width is never guessed at. */
+const PAYER_VIEWBOX = { w: 30, h: 24 } as const
+
 /* -------------------------------------------------------------------------
  * Timing. Every number is milliseconds from the first frame.
  *
  * PACE scales the whole thing at once — the one knob worth having, because
- * legibility is a judgement call and not a code change. At 2 the run is 4.2s,
+ * legibility is a judgement call and not a code change. At 2 the run is 5.9s,
  * which is long for a cold start; the skip pill is what makes that bearable.
  * ------------------------------------------------------------------------- */
 
 const PACE = 2
+
+/** How long the balance takes to run down. */
+const COUNT_MS = 400
+/**
+ * The pause on zero, before the digits become the people who cleared it.
+ *
+ * This is the point of the beat rather than a gap between two others: a
+ * balance reaching nothing has to be read as a result before anything happens
+ * to it. At PACE 2 it is the half second it is meant to be, which is why the
+ * phase after it is derived from this and not typed out — moving the count
+ * must not silently eat the pause.
+ */
+const SETTLE_PAUSE = 250
+const COUNT_AT = 1040
+
 const T = {
   sum: 460,
   divide: 700,
   share: 880,
-  paid: 1060,
-  count: 1440,
-  points: 1880,
-  form: 2040,
-  wordmark: 2330,
-  hold: 2530,
-  done: 2760,
+  count: COUNT_AT,
+  settled: COUNT_AT + COUNT_MS + SETTLE_PAUSE,
+  points: 2090,
+  form: 2250,
+  wordmark: 2540,
+  hold: 2740,
+  done: 2940,
 } as const
 
-/** Between one payer landing and the next. */
-const PAYER_STAGGER = 85
-/** How long the balance takes to run down once everyone has paid. */
-const COUNT_MS = 400
+/** Between one payer arriving and the next. */
+const PAYER_STAGGER = 45
 /** Two integer digits, so the counter keeps its width — and zero draws four. */
 const COUNTER_DIGITS = 2
 
@@ -90,8 +106,8 @@ const PHASES = [
   ['sum', T.sum],
   ['divide', T.divide],
   ['share', T.share],
-  ['paid', T.paid],
   ['count', T.count],
+  ['settled', T.settled],
   ['points', T.points],
   ['form', T.form],
   ['wordmark', T.wordmark],
@@ -146,6 +162,27 @@ function place(circle: { x: number; y: number; r: number }) {
 /** The fourth point seeds the curve and is swallowed by it. */
 const SEED_TARGET = { x: (SEED.x - 0.5) * HERO_W, y: 0, d: 0.1 }
 
+/* -------------------------------------------------------------------------
+ * The four who paid
+ *
+ * They are the counter's own digits, so they are sized off the column the
+ * counter is set in — but they cannot stand where the digits stood. A digit
+ * occupies 0.291 stage em and this icon 0.585, exactly twice, so four of them
+ * on four digit advances would overlap by half. They step apart as they
+ * arrive, to a pitch of their own width plus the gap the pair beside the
+ * counter always used.
+ *
+ * Centred on nothing rather than on the counter: the divisor and the rule
+ * above them are the composition's axis, and the counter sits off it by the
+ * width of a currency sign.
+ * ------------------------------------------------------------------------- */
+
+/** The arithmetic column's size, as a fraction of the stage. */
+const COLUMN = 0.6
+const PAYER_H = COLUMN * 0.78
+const PAYER_W = PAYER_H * (PAYER_VIEWBOX.w / PAYER_VIEWBOX.h)
+const PAYER_PITCH = PAYER_W + COLUMN * 0.34
+
 /**
  * Left to right, so the four zeros travel without crossing: the leftmost zero
  * takes the leftmost circle. Anything else reads as a shuffle.
@@ -159,8 +196,12 @@ const TARGETS = [
 
 /** Where a glyph stands before it stops being type, in stage em. */
 interface Seat {
+  /** Where the digit itself stood — where the person it becomes starts from. */
+  from: number
+  /** Where that person stands once the four of them have stepped apart. */
   x: number
   y: number
+  /** The point they collapse into, sized to read as the digit's own mass. */
   d: number
 }
 
@@ -327,12 +368,12 @@ function Equation({ phase }: { phase: Phase }) {
 
   /*
    * Where the four zeros stand, read the frame they stop being type and start
-   * being points. Measured rather than laid out by hand: the glyph advance
+   * being people. Measured rather than laid out by hand: the glyph advance
    * belongs to the typeface, and a number copied out of it here would be wrong
    * the first time anyone changes the face or the size.
    */
   useLayoutEffect(() => {
-    if (seats || !at('points', phase)) return
+    if (seats || !at('settled', phase)) return
     const stage = stageRef.current
     if (!stage) return
     const origin = stage.getBoundingClientRect()
@@ -341,14 +382,20 @@ function Equation({ phase }: { phase: Phase }) {
       if (!node) return null
       const box = node.getBoundingClientRect()
       return {
-        x: (box.left + box.width / 2 - origin.left) / em,
+        from: (box.left + box.width / 2 - origin.left) / em,
         y: (box.top + box.height / 2 - origin.top) / em,
         // A zero is taller than it is wide; the point that replaces it should
         // read as the same mass, not the same box.
         d: (box.width * 0.74) / em,
       }
     })
-    if (measured.every((seat): seat is Seat => seat !== null)) setSeats(measured)
+    if (!measured.every((seat) => seat !== null)) return
+    setSeats(
+      measured.map((seat, index) => ({
+        ...seat,
+        x: (index - (HEADS - 1) / 2) * PAYER_PITCH,
+      })),
+    )
   }, [phase, seats])
 
   return (
@@ -418,30 +465,27 @@ function Equation({ phase }: { phase: Phase }) {
           </motion.span>
           <Rule show={at('share', phase)} />
 
-          {/*
-            The payers sit outside the flow on purpose. In it, they would set
-            the column's width and stretch the division rule above them to the
-            span of four icons, which is not what the rule divides.
-          */}
           <motion.span
-            className="relative"
             initial={{ opacity: 0 }}
             animate={{ opacity: at('share', phase) ? 1 : 0 }}
             transition={{ delay: s(60), duration: s(150), ease: EASE }}
           >
-            <Payers side="left" shown={at('paid', phase)} hidden={at('points', phase)} />
+            {/* It leaves as the people arrive, not before: the digits have to
+                still be measurable on the frame their seats are read. Opacity
+                does that; unmounting would not. */}
             <Counter
               running={at('count', phase)}
-              hidden={at('points', phase)}
+              hidden={at('settled', phase)}
               digitsRef={digitsRef}
             />
-            <Payers side="right" shown={at('paid', phase)} hidden={at('points', phase)} />
           </motion.span>
         </div>
       </Layer>
 
-      {/* Scene 6: the zeros, become points, become the artwork. */}
-      <Points seats={seats} forming={forming} />
+      {/* Scene 6: the zeros, become the people who cleared them, become the
+          points of the artwork. */}
+      <Settled seats={seats} gone={at('points', phase)} />
+      <Points seats={seats} show={at('points', phase)} forming={forming} />
       <MarkForm forming={forming} lockup={lockup} />
 
       {/* Scene 7: the lettering, revealed rather than rebuilt. */}
@@ -503,73 +547,88 @@ function Counter({
   }, [running, value])
 
   return (
-    <motion.span
-      className="inline-flex"
-      animate={{ opacity: hidden ? 0 : 1 }}
-      transition={{ duration: s(90), ease: EASE }}
-    >
-      {GLYPHS.map((glyph, index) => (
-        <span
-          key={index}
-          ref={(node) => {
-            glyphs.current[index] = node
-            const seat = DIGIT_INDICES.indexOf(index)
-            if (seat >= 0) digitsRef.current[seat] = node
-          }}
-        >
-          {glyph.char}
-        </span>
-      ))}
-    </motion.span>
+    <span className="inline-flex">
+      {GLYPHS.map((glyph, index) => {
+        const seat = DIGIT_INDICES.indexOf(index)
+        return (
+          <motion.span
+            key={index}
+            ref={(node) => {
+              glyphs.current[index] = node
+              if (seat >= 0) digitsRef.current[seat] = node
+            }}
+            animate={{ opacity: hidden ? 0 : 1 }}
+            /*
+             * Glyph by glyph, not all at once: each digit leaves on the beat
+             * its own person arrives, so the two read as one exchange rather
+             * than as a number disappearing and a row turning up afterwards.
+             * The currency sign and the point have nobody to become, so they
+             * go first and let the digits stand alone for a moment.
+             */
+            transition={{
+              duration: s(130),
+              delay: hidden && seat >= 0 ? s(seat * PAYER_STAGGER) : 0,
+              ease: EASE,
+            }}
+          >
+            {glyph.char}
+          </motion.span>
+        )
+      })}
+    </span>
   )
 }
 
-/** Two of the four people who owed, landing one after another once settled. */
-function Payers({
-  side,
-  shown,
-  hidden,
-}: {
-  side: 'left' | 'right'
-  shown: boolean
-  hidden: boolean
-}) {
-  const seats = side === 'left' ? [0, 1] : [2, 3]
+/**
+ * The balance, become the four people who cleared it.
+ *
+ * Each digit turns into one of them where it stood and then steps out to its
+ * place in the row, one after another — so the row is read as arriving rather
+ * than as appearing, and the count that just ran down is visibly what it is
+ * made of. They hold, and then condense into the points.
+ */
+function Settled({ seats, gone }: { seats: Seat[] | null; gone: boolean }) {
+  if (!seats) return null
   return (
-    <span
-      className={`absolute top-1/2 flex -translate-y-1/2 gap-[0.34em] ${
-        side === 'left' ? 'right-full mr-[0.46em]' : 'left-full ml-[0.46em]'
-      }`}
-    >
-      {seats.map((seat) => (
+    <>
+      {seats.map((seat, index) => (
         <motion.span
-          key={seat}
-          className="flex text-positive"
-          initial={{ opacity: 0, scale: 0.5 }}
+          key={index}
+          className="absolute left-1/2 top-1/2 flex text-positive"
+          style={{
+            marginLeft: `${-PAYER_W / 2}em`,
+            marginTop: `${-PAYER_H / 2}em`,
+            width: `${PAYER_W}em`,
+            height: `${PAYER_H}em`,
+          }}
+          initial={{ opacity: 0, x: `${seat.from}em`, y: `${seat.y}em`, scale: 0.4 }}
           animate={
-            hidden
-              ? { opacity: 0, scale: 1 }
-              : shown
-                ? { opacity: 1, scale: 1 }
-                : { opacity: 0, scale: 0.5 }
+            gone
+              ? { opacity: 0, x: `${seat.x}em`, y: `${seat.y}em`, scale: 0.55 }
+              : { opacity: 1, x: `${seat.x}em`, y: `${seat.y}em`, scale: 1 }
           }
           transition={{
-            duration: s(hidden ? 90 : 150),
-            delay: hidden ? 0 : s(seat * PAYER_STAGGER),
+            duration: s(gone ? 110 : 210),
+            delay: gone ? 0 : s(index * PAYER_STAGGER),
             ease: SETTLE,
           }}
         >
           <PayerIcon />
         </motion.span>
       ))}
-    </span>
+    </>
   )
 }
 
 /** Someone who has paid: a figure, and the tick that settles them. */
 function PayerIcon() {
   return (
-    <svg viewBox="0 0 30 24" className="h-[0.78em] w-auto" fill="none" aria-hidden="true">
+    <svg
+      viewBox={`0 0 ${PAYER_VIEWBOX.w} ${PAYER_VIEWBOX.h}`}
+      className="h-full w-full"
+      fill="none"
+      aria-hidden="true"
+    >
       <circle cx="8" cy="6.2" r="4" fill="currentColor" />
       <path d="M1.6 20.8a6.4 6.4 0 0 1 12.8 0z" fill="currentColor" />
       <path
@@ -628,8 +687,19 @@ function Rule({ show }: { show: boolean }) {
  * its position, so the two standing in for the cutouts neither leave a gap nor
  * show through the negative space.
  */
-function Points({ seats, forming }: { seats: Seat[] | null; forming: boolean }) {
-  if (!seats) return null
+function Points({
+  seats,
+  show,
+  forming,
+}: {
+  seats: Seat[] | null
+  show: boolean
+  forming: boolean
+}) {
+  // Held back until the people have condensed. The seats are read a scene
+  // earlier than this, so without the gate four dots would sit on top of the
+  // four they are supposed to replace.
+  if (!seats || !show) return null
   return (
     <>
       {TARGETS.map((target, index) => {
