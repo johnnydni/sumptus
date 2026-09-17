@@ -56,14 +56,14 @@ const PAYER_VIEWBOX = { w: 30, h: 24 } as const
  * Timing. Every number is milliseconds from the first frame.
  *
  * PACE scales the whole thing at once — the one knob worth having, because
- * legibility is a judgement call and not a code change. At 2 the run is 5.9s,
+ * legibility is a judgement call and not a code change. At 2 the run is 6.0s,
  * which is long for a cold start; the skip pill is what makes that bearable.
  * ------------------------------------------------------------------------- */
 
 const PACE = 2
 
 /** How long the balance takes to run down. */
-const COUNT_MS = 400
+const COUNT_MS = 360
 /**
  * The pause on zero, before the digits become the people who cleared it.
  *
@@ -74,23 +74,27 @@ const COUNT_MS = 400
  * must not silently eat the pause.
  */
 const SETTLE_PAUSE = 250
-const COUNT_AT = 1040
+const COUNT_AT = 1010
 
 const T = {
-  sum: 460,
-  divide: 700,
-  share: 880,
+  sum: 440,
+  divide: 680,
+  share: 860,
   count: COUNT_AT,
   settled: COUNT_AT + COUNT_MS + SETTLE_PAUSE,
-  points: 2090,
-  form: 2250,
-  wordmark: 2540,
-  hold: 2740,
-  done: 2940,
+  points: 2200,
+  form: 2360,
+  wordmark: 2650,
+  hold: 2840,
+  done: 3020,
 } as const
 
-/** Between one payer arriving and the next. */
-const PAYER_STAGGER = 45
+/** Between one digit's exchange and the next. */
+const PAYER_STAGGER = 38
+/** The exchange itself: the digit out, the figure in, on one spot. */
+const MORPH_MS = 150
+/** And then stepping out of the counter's line into the row. */
+const TRAVEL_MS = 190
 /** Two integer digits, so the counter keeps its width — and zero draws four. */
 const COUNTER_DIGITS = 2
 
@@ -179,9 +183,23 @@ const SEED_TARGET = { x: (SEED.x - 0.5) * HERO_W, y: 0, d: 0.1 }
 
 /** The arithmetic column's size, as a fraction of the stage. */
 const COLUMN = 0.6
-const PAYER_H = COLUMN * 0.78
+/**
+ * Bigger than the type they come from — they are the subject of the scene by
+ * the time they are standing, not an annotation on a number.
+ */
+const PAYER_H = COLUMN * 1.1
 const PAYER_W = PAYER_H * (PAYER_VIEWBOX.w / PAYER_VIEWBOX.h)
-const PAYER_PITCH = PAYER_W + COLUMN * 0.34
+const PAYER_PITCH = PAYER_W * 1.26
+/**
+ * How wide a figure is at the instant it takes the digit's place, as a
+ * multiple of that digit's own width.
+ *
+ * Near enough to one that the exchange happens on the same footprint, which is
+ * what makes it read as one shape becoming another rather than two shapes
+ * trading places. It grows to full size on the way out to the row, so no two
+ * of them are ever large and overlapping at once.
+ */
+const MORPH_WIDTH = 1.3
 
 /**
  * Left to right, so the four zeros travel without crossing: the leftmost zero
@@ -201,6 +219,8 @@ interface Seat {
   /** Where that person stands once the four of them have stepped apart. */
   x: number
   y: number
+  /** The digit's own width — the footprint the exchange happens on. */
+  w: number
   /** The point they collapse into, sized to read as the digit's own mass. */
   d: number
 }
@@ -384,6 +404,7 @@ function Equation({ phase }: { phase: Phase }) {
       return {
         from: (box.left + box.width / 2 - origin.left) / em,
         y: (box.top + box.height / 2 - origin.top) / em,
+        w: box.width / em,
         // A zero is taller than it is wide; the point that replaces it should
         // read as the same mass, not the same box.
         d: (box.width * 0.74) / em,
@@ -557,16 +578,20 @@ function Counter({
               glyphs.current[index] = node
               if (seat >= 0) digitsRef.current[seat] = node
             }}
-            animate={{ opacity: hidden ? 0 : 1 }}
             /*
              * Glyph by glyph, not all at once: each digit leaves on the beat
-             * its own person arrives, so the two read as one exchange rather
-             * than as a number disappearing and a row turning up afterwards.
+             * its own figure takes its place, so the two read as one exchange
+             * rather than as a number disappearing and a row turning up
+             * afterwards. It opens slightly as it goes, which is the half of
+             * the morph that belongs to the type — the figure is doing the
+             * other half on the same spot at the same moment.
+             *
              * The currency sign and the point have nobody to become, so they
-             * go first and let the digits stand alone for a moment.
+             * go first and let the digits stand alone for a beat.
              */
+            animate={{ opacity: hidden ? 0 : 1, scale: hidden && seat >= 0 ? 1.45 : 1 }}
             transition={{
-              duration: s(130),
+              duration: s(seat >= 0 ? MORPH_MS : 110),
               delay: hidden && seat >= 0 ? s(seat * PAYER_STAGGER) : 0,
               ease: EASE,
             }}
@@ -589,33 +614,58 @@ function Counter({
  */
 function Settled({ seats, gone }: { seats: Seat[] | null; gone: boolean }) {
   if (!seats) return null
+  /* The exchange happens in place and the growing happens on the way out, so
+     the two halves of the move are one animation with a waypoint in it. */
+  const span = MORPH_MS + TRAVEL_MS
+  const waypoint = MORPH_MS / span
   return (
     <>
-      {seats.map((seat, index) => (
-        <motion.span
-          key={index}
-          className="absolute left-1/2 top-1/2 flex text-positive"
-          style={{
-            marginLeft: `${-PAYER_W / 2}em`,
-            marginTop: `${-PAYER_H / 2}em`,
-            width: `${PAYER_W}em`,
-            height: `${PAYER_H}em`,
-          }}
-          initial={{ opacity: 0, x: `${seat.from}em`, y: `${seat.y}em`, scale: 0.4 }}
-          animate={
-            gone
-              ? { opacity: 0, x: `${seat.x}em`, y: `${seat.y}em`, scale: 0.55 }
-              : { opacity: 1, x: `${seat.x}em`, y: `${seat.y}em`, scale: 1 }
-          }
-          transition={{
-            duration: s(gone ? 110 : 210),
-            delay: gone ? 0 : s(index * PAYER_STAGGER),
-            ease: SETTLE,
-          }}
-        >
-          <PayerIcon />
-        </motion.span>
-      ))}
+      {seats.map((seat, index) => {
+        // Starting as wide as the digit it replaces, in this icon's own scale.
+        const born = (seat.w * MORPH_WIDTH) / PAYER_W
+        const rest = { x: `${seat.from}em`, y: `${seat.y}em`, scale: born }
+        return (
+          <motion.span
+            key={index}
+            className="absolute left-1/2 top-1/2 flex text-positive"
+            style={{
+              marginLeft: `${-PAYER_W / 2}em`,
+              marginTop: `${-PAYER_H / 2}em`,
+              width: `${PAYER_W}em`,
+              height: `${PAYER_H}em`,
+            }}
+            initial={{ opacity: 0, ...rest }}
+            animate={
+              gone
+                ? { opacity: 0, x: `${seat.x}em`, y: `${seat.y}em`, scale: 0.6 }
+                : {
+                    opacity: 1,
+                    y: `${seat.y}em`,
+                    // Holds the digit's spot while it takes its shape, then
+                    // steps out. A figure that slid away as it appeared would
+                    // read as arriving from somewhere, not as becoming.
+                    x: [`${seat.from}em`, `${seat.from}em`, `${seat.x}em`],
+                    // Full size only once it is standing where it belongs: two
+                    // of them at full size on two digit advances would overlap.
+                    scale: 1,
+                  }
+            }
+            transition={
+              gone
+                ? { duration: s(110), ease: EASE }
+                : {
+                    delay: s(index * PAYER_STAGGER),
+                    duration: s(span),
+                    ease: SETTLE,
+                    x: { duration: s(span), times: [0, waypoint, 1], ease: SETTLE },
+                    opacity: { duration: s(MORPH_MS * 0.8), ease: EASE },
+                  }
+            }
+          >
+            <PayerIcon />
+          </motion.span>
+        )
+      })}
     </>
   )
 }
