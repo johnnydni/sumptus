@@ -79,6 +79,16 @@ export default defineConfig(({ command }) => {
             type: 'image/png',
             purpose: 'maskable',
           },
+          // Android's themed icons: the launcher keeps the alpha and recolours
+          // the rest, so without this it tints the white sheet and the mark
+          // vanishes into it — the same way iOS did before the icon was
+          // inverted for it.
+          {
+            src: 'icons/icon-512-monochrome.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'monochrome',
+          },
         ],
       },
       workbox: {

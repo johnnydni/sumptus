@@ -26,7 +26,7 @@ const ASPECT = source.width / source.height
  * Compose one icon: a rounded (or full-bleed) sheet with the mark centred on
  * it, sized as a fraction of the canvas.
  */
-function render(size, { background, foreground, radius, markHeight }) {
+function render(size, { background, foreground, radius, markHeight, markOnly = false }) {
   const buffer = Buffer.alloc(size * size * 4)
 
   const mh = Math.round(size * markHeight)
@@ -48,9 +48,11 @@ function render(size, { background, foreground, radius, markHeight }) {
   for (let py = 0; py < size; py += 1) {
     for (let px = 0; px < size; px += 1) {
       let covered = 0
-      for (let sy = 0; sy < samples; sy += 1) {
-        for (let sx = 0; sx < samples; sx += 1) {
-          if (inSheet(px + (sx + 0.5) * step, py + (sy + 0.5) * step)) covered += 1
+      if (!markOnly) {
+        for (let sy = 0; sy < samples; sy += 1) {
+          for (let sx = 0; sx < samples; sx += 1) {
+            if (inSheet(px + (sx + 0.5) * step, py + (sy + 0.5) * step)) covered += 1
+          }
         }
       }
       const sheet = covered / (samples * samples)
@@ -103,14 +105,31 @@ write('public/icons/favicon.png', 64, {
 /*
  * Home screen, iOS.
  *
- * Two rules that differ from the icons above. It must be opaque and square:
- * iOS composites an apple-touch-icon onto black and rounds it itself, so
- * transparent corners come back as black ones. And it wants 180×180 — handing
- * it the 192 the manifest uses only makes the device rescale.
+ * Three rules that differ from the icons above.
+ *
+ * It must be opaque and square: iOS composites an apple-touch-icon onto black
+ * and rounds it itself, so transparent corners come back as black ones. And it
+ * wants 180×180 — handing it the 192 the manifest uses only makes the device
+ * rescale.
+ *
+ * And it is inverted: a navy sheet with a white mark, where every other icon
+ * here is the app's own white canvas. That is not a second opinion about the
+ * brand, it is what the home screen does with it. iOS renders a legacy flat
+ * icon in its transparent and tinted appearances by reading brightness as
+ * material — bright becomes glass, dark becomes empty. A white sheet is 93% of
+ * the tile at full brightness, so the whole square turns into one slab of glass
+ * and the mark is left as a faint subtraction inside it, which is exactly how
+ * it looked on a phone. Inverting puts the material where the mark is and
+ * leaves the rest of the tile empty, which is the shape of every icon that
+ * survives that treatment.
+ *
+ * Verify it the only way that counts: add the app to a home screen, then
+ * switch the icon appearance to Clear or Tinted. A simulation of Apple's
+ * compositing is a guess about someone else's renderer.
  */
 write('public/icons/apple-touch-icon.png', 180, {
-  background: WHITE,
-  foreground: INK,
+  background: NAVY,
+  foreground: WHITE,
   radius: 0,
   markHeight: 0.54,
 })
@@ -121,4 +140,19 @@ write('public/icons/icon-512-maskable.png', 512, {
   foreground: WHITE,
   radius: 0,
   markHeight: 0.42,
+})
+
+/*
+ * Android's themed icons, which have the same problem and a proper answer for
+ * it: the platform ignores colour here and keeps only the alpha channel, then
+ * fills the shape with whatever the user's wallpaper suggests. So this one is
+ * the mark alone on nothing — and it has to respect the maskable safe zone,
+ * because the launcher crops it the same way.
+ */
+write('public/icons/icon-512-monochrome.png', 512, {
+  background: WHITE,
+  foreground: WHITE,
+  radius: 0,
+  markHeight: 0.42,
+  markOnly: true,
 })
