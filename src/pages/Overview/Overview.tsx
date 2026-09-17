@@ -9,6 +9,7 @@ import { calculateGroupBalances } from "@/lib/calculations";
 import { greeting } from "@/lib/dates";
 import { BalanceCard } from "@/components/balance/BalanceCard";
 import { GroupCard } from "@/components/groups/GroupCard";
+import { NewGroupCard } from "@/components/groups/NewGroupCard";
 import { ActivityRow } from "@/components/activity/ActivityRow";
 import { EmptyState, List, SectionHeader } from "@/components/ui/Primitives";
 import { Button } from "@/components/ui/Button";
@@ -157,6 +158,7 @@ export default function Overview() {
                 currency={summary.group.currency}
               />
             ))}
+            <NewGroupCard />
           </div>
         )}
       </motion.section>
